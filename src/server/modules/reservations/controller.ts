@@ -1,7 +1,6 @@
 import "server-only";
 
 import { NextRequest, NextResponse } from "next/server";
-
 import { ZodError } from "zod";
 
 import { requireAuth, requireEmployee } from "@/server/auth/permissions";
@@ -15,10 +14,7 @@ import { reservationService } from "./service";
 function handleError(error: unknown) {
   if (error instanceof AuthError || error instanceof BookingError) {
     return NextResponse.json(
-      {
-        success: false,
-        message: error.message,
-      },
+      { success: false, message: error.message },
       { status: error.statusCode },
     );
   }
@@ -52,10 +48,7 @@ export const reservationController = {
 
       if (origin && origin !== request.nextUrl.origin) {
         return NextResponse.json(
-          {
-            success: false,
-            message: "Invalid request origin.",
-          },
+          { success: false, message: "Invalid request origin." },
           { status: 403 },
         );
       }
@@ -68,10 +61,7 @@ export const reservationController = {
         body = await request.json();
       } catch {
         return NextResponse.json(
-          {
-            success: false,
-            message: "Invalid JSON body.",
-          },
+          { success: false, message: "Invalid JSON." },
           { status: 400 },
         );
       }
@@ -93,10 +83,14 @@ export const reservationController = {
     }
   },
 
-  async list() {
+  async list(request: NextRequest) {
     try {
       const user = await requireAuth();
-      const reservations = await reservationService.list(user);
+
+      const includeHistory =
+        request.nextUrl.searchParams.get("history") === "true";
+
+      const reservations = await reservationService.list(user, includeHistory);
 
       return NextResponse.json({
         success: true,
