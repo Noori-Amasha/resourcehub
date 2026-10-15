@@ -8,6 +8,7 @@ import {
 } from "@/server/config/bookingRules";
 
 import { reservationRepository } from "./repository";
+import { isVisibleInNormalList } from "./visibility";
 import type { CreateReservationInput } from "./validation";
 
 function isConstraintError(error: unknown): boolean {
@@ -44,7 +45,7 @@ export const reservationService = {
 
       if (isConstraintError(error)) {
         throw new BookingError(
-          "Reservation conflict. Choose another time or physical unit.",
+          "Reservation conflict. Choose another time or unit.",
           409,
         );
       }
@@ -53,7 +54,7 @@ export const reservationService = {
     }
   },
 
-  async list(user: { id: string; role: UserRole }) {
+  async list(user: { id: string; role: UserRole }, includeHistory = false) {
     const reservations =
       user.role === UserRole.ADMIN
         ? await reservationRepository.listAll()
@@ -61,11 +62,16 @@ export const reservationService = {
 
     const now = new Date();
 
-    return reservations.map((reservation) => ({
-      ...reservation,
-      isOverdue:
-        reservation.status === ReservationStatus.CHECKED_OUT &&
-        reservation.endTime < now,
-    }));
+    return reservations
+      .filter(
+        (reservation) =>
+          includeHistory || isVisibleInNormalList(reservation, now),
+      )
+      .map((reservation) => ({
+        ...reservation,
+        isOverdue:
+          reservation.status === ReservationStatus.CHECKED_OUT &&
+          reservation.endTime < now,
+      }));
   },
 };
