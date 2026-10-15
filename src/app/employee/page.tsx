@@ -8,7 +8,7 @@ import {
 export default function EmployeeDashboard() {
   return (
     <div className="space-y-8">
-      <div className="rounded-3xl bg-gradient-to-r from-yellow-300 to-amber-100 p-8">
+      <div className="rounded-3xl bg-linear-to-r from-yellow-300 to-amber-100 p-8">
         <CalendarDays size={32} className="mb-5" />
 
         <h2 className="text-3xl font-bold">

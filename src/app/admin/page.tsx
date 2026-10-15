@@ -26,7 +26,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="rounded-3xl bg-gradient-to-r from-yellow-300 to-amber-100 p-8">
+      <div className="rounded-3xl bg-linear-to-r from-yellow-300 to-amber-100 p-8">
         <div className="mb-4 inline-flex rounded-xl bg-white/70 p-3">
           <ShieldCheck size={26} />
         </div>
