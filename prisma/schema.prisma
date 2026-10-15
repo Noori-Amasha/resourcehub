@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================
+// ENUMS
+// =====================================
+
+enum UserRole {
+  ADMIN
+  EMPLOYEE
+}
+
+enum ResourceUnitStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum ReservationStatus {
+  CONFIRMED
+  CHECKED_OUT
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ReservationEventType {
+  CREATED
+  CHECKED_OUT
+  RETURNED
+  CANCELLED
+  MARKED_NO_SHOW
+  REASSIGNED
+  MAINTENANCE_STARTED
+  MAINTENANCE_ENDED
+}
+
+enum CancellationReason {
+  USER_REQUEST
+  ADMIN_REQUEST
+  RESOURCE_MAINTENANCE
+}
+
+// =====================================
+// MODEL 1: USER
+// =====================================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(120)
+  email        String   @unique @db.VarChar(255)
+  passwordHash String
+  role         UserRole @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  reservations          Reservation[]      @relation("EmployeeReservations")
+  cancelledReservations Reservation[]      @relation("ReservationCancelledBy")
+  reservationEvents     ReservationEvent[] @relation("EventActor")
+
+  @@index([role])
+}
+
+// =====================================
+// MODEL 2: RESOURCE CATEGORY
+// =====================================
+
+model ResourceCategory {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique @db.VarChar(120)
+  description String? @db.Text
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  resourceTypes ResourceType[]
+}
+
+// =====================================
+// MODEL 3: RESOURCE TYPE
+// =====================================
+
+model ResourceType {
+  id          String  @id @default(uuid()) @db.Uuid
+  categoryId  String  @db.Uuid
+  name        String  @db.VarChar(120)
+  description String? @db.Text
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  category ResourceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  units    ResourceUnit[]
+
+  @@unique([categoryId, name])
+  @@index([categoryId])
+}
+
+// =====================================
+// MODEL 4: RESOURCE UNIT
+// =====================================
+
+model ResourceUnit {
+  id             String             @id @default(uuid()) @db.Uuid
+  resourceTypeId String             @db.Uuid
+  unitCode       String             @unique @db.VarChar(80)
+  name           String?            @db.VarChar(120)
+  description    String?            @db.Text
+  status         ResourceUnitStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  resourceType      ResourceType       @relation(fields: [resourceTypeId], references: [id], onDelete: Restrict)
+  reservations      Reservation[]
+  reservationEvents ReservationEvent[]
+
+  @@index([resourceTypeId])
+  @@index([status])
+  @@index([resourceTypeId, status])
+}
+
+// =====================================
+// MODEL 5: RESERVATION
+// =====================================
+
+model Reservation {
+  id             String @id @default(uuid()) @db.Uuid
+  employeeId     String @db.Uuid
+  resourceUnitId String @db.Uuid
+
+  startTime DateTime @db.Timestamptz(3)
+  endTime   DateTime @db.Timestamptz(3)
+
+  status  ReservationStatus @default(CONFIRMED)
+  purpose String?           @db.Text
+
+  checkedOutAt DateTime? @db.Timestamptz(3)
+  returnedAt   DateTime? @db.Timestamptz(3)
+
+  cancelledAt        DateTime?           @db.Timestamptz(3)
+  cancelledById      String?             @db.Uuid
+  cancellationReason CancellationReason?
+
+  noShowAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  employee     User               @relation("EmployeeReservations", fields: [employeeId], references: [id], onDelete: Restrict)
+  resourceUnit ResourceUnit       @relation(fields: [resourceUnitId], references: [id], onDelete: Restrict)
+  cancelledBy  User?              @relation("ReservationCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  events       ReservationEvent[]
+
+  @@index([employeeId, startTime])
+  @@index([resourceUnitId, startTime, endTime])
+  @@index([status, startTime])
+  @@index([cancelledAt])
+  @@index([noShowAt])
+}
+
+// =====================================
+// MODEL 6: RESERVATION EVENT
+// =====================================
+
+model ReservationEvent {
+  id             String  @id @default(uuid()) @db.Uuid
+  reservationId  String? @db.Uuid
+  resourceUnitId String? @db.Uuid
+  actorId        String  @db.Uuid
+
+  eventType ReservationEventType
+  details   Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  reservation  Reservation?  @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  resourceUnit ResourceUnit? @relation(fields: [resourceUnitId], references: [id], onDelete: Restrict)
+  actor        User          @relation("EventActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId, createdAt])
+  @@index([resourceUnitId, createdAt])
+  @@index([actorId])
+  @@index([eventType])
+}
